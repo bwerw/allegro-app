@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aktualizator Allegro – Excel</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #1a1a1a; font-size: 14px; }
+  .app { max-width: 1100px; margin: 0 auto; padding: 24px 16px; }
+  h1 { font-size: 20px; font-weight: 600; margin-bottom: 6px; }
+  .subtitle { color: #666; font-size: 13px; margin-bottom: 24px; }
+
+  .card { background: #fff; border: 1px solid #e5e5e5; border-radius: 10px; padding: 20px; margin-bottom: 16px; }
+  .card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+  .num { width: 26px; height: 26px; border-radius: 50%; background: #1a1a1a; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; flex-shrink: 0; }
+  .num.done { background: #16a34a; }
+  .card-title { font-size: 15px; font-weight: 600; }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  @media(max-width:600px){ .grid2 { grid-template-columns: 1fr; } }
+  label { display: block; font-size: 12px; color: #555; margin-bottom: 4px; font-weight: 500; }
+  input[type=text], input[type=password] {
+    width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px;
+    font-size: 13px; background: #fff; color: #1a1a1a; outline: none;
+  }
+  input[type=text]:focus, input[type=password]:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+
+  .info { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 10px 14px; font-size: 12px; color: #1e40af; margin-bottom: 14px; line-height: 1.6; }
+  .info a { color: #1d4ed8; }
+
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; border-radius: 6px; border: 1px solid #d1d5db; background: #fff; color: #1a1a1a; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.15s; }
+  .btn:hover { background: #f9fafb; }
+  .btn-primary { background: #2563eb; color: #fff; border-color: #2563eb; }
+  .btn-primary:hover { background: #1d4ed8; border-color: #1d4ed8; }
+  .btn-primary:disabled { background: #93c5fd; border-color: #93c5fd; cursor: not-allowed; }
+  .btn-green { background: #16a34a; color: #fff; border-color: #16a34a; }
+  .btn-green:hover { background: #15803d; }
+
+  .drop {
+    border: 2px dashed #d1d5db; border-radius: 8px; padding: 32px; text-align: center;
+    cursor: pointer; transition: all 0.15s; color: #555;
+  }
+  .drop:hover, .drop.over { border-color: #2563eb; background: #eff6ff; }
+  .drop .icon { font-size: 32px; margin-bottom: 8px; }
+  .drop p { font-size: 13px; }
+  .drop p b { color: #1a1a1a; }
+  .drop input { display: none; }
+
+  .file-ok { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding: 8px 12px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; font-size: 13px; color: #166534; }
+
+  .actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+  .status-msg { font-size: 12px; }
+  .status-ok { color: #16a34a; }
+  .status-err { color: #dc2626; }
+  .status-info { color: #2563eb; }
+
+  .progress-wrap { height: 5px; background: #e5e7eb; border-radius: 99px; overflow: hidden; margin-top: 12px; }
+  .progress-bar { height: 100%; background: #2563eb; border-radius: 99px; width: 0; transition: width 0.3s; }
+
+  .log { font-size: 12px; color: #555; margin-top: 6px; min-height: 18px; }
+
+  .table-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px; }
+  .count { font-size: 12px; color: #666; }
+
+  .table-wrap { overflow: auto; max-height: 420px; border: 1px solid #e5e7eb; border-radius: 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; min-width: 700px; }
+  th { background: #f9fafb; padding: 8px 10px; text-align: left; font-weight: 600; font-size: 11px; color: #555; border-bottom: 1px solid #e5e7eb; position: sticky; top: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  td { padding: 6px 10px; border-bottom: 1px solid #f3f4f6; color: #1a1a1a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #fafafa; }
+  td input { width: 100%; border: none; background: transparent; font-size: 12px; color: #1a1a1a; outline: none; }
+  td input:focus { background: #eff6ff; border-radius: 4px; padding: 0 4px; }
+
+  .badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 99px; }
+  .badge-wait { background: #f3f4f6; color: #6b7280; }
+  .badge-load { background: #dbeafe; color: #1d4ed8; }
+  .badge-ok { background: #dcfce7; color: #16a34a; }
+  .badge-skip { background: #fef3c7; color: #92400e; }
+  .badge-err { background: #fee2e2; color: #dc2626; }
+
+  .link-cell a { color: #2563eb; font-size: 11px; text-decoration: none; }
+  .link-cell a:hover { text-decoration: underline; }
+  .no-data { color: #9ca3af; font-style: italic; }
+
+  .col-name { width: 180px; }
+  .col-ean { width: 110px; }
+  .col-link { width: 70px; }
+  .col-buy { width: 90px; }
+  .col-low { width: 90px; }
+  .col-pct { width: 70px; }
+  .col-amt { width: 70px; }
+  .col-st { width: 70px; }
+
+  .tip { font-size: 11px; color: #9ca3af; margin-top: 6px; }
+
+  .section-hidden { display: none; }
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>🛒 Aktualizator danych Allegro</h1>
+  <p class="subtitle">Wczytaj swój plik Excel i automatycznie pobierz najniższe ceny oraz prowizje z Allegro API</p>
+
+  <!-- KROK 1: API -->
+  <div class="card">
+    <div class="card-head">
+      <div class="num" id="num1">1</div>
+      <span class="card-title">Klucze Allegro API</span>
+    </div>
+    <div class="info">
+      Pobierz <b>Client ID</b> i <b>Client Secret</b> z <a href="https://apps.developer.allegro.pl" target="_blank">apps.developer.allegro.pl</a>.
+      Klucze są używane wyłącznie lokalnie w tej przeglądarce — nic nie jest wysyłane na zewnątrz.
+    </div>
+    <div class="grid2">
+      <div>
+        <label>Client ID</label>
+        <input type="text" id="clientId" placeholder="np. a1b2c3d4e5f6..." />
+      </div>
+      <div>
+        <label>Client Secret</label>
+        <input type="password" id="clientSecret" placeholder="••••••••••••" />
+      </div>
+    </div>
+    <div style="margin-bottom:12px">
+      <label>Masz już token? Wklej go tutaj (opcjonalnie)</label>
+      <input type="text" id="manualToken" placeholder="eyJ..." />
+      <p class="tip">Token możesz uzyskać ręcznie przez OAuth lub wkleić jeśli już masz.</p>
+    </div>
+    <div class="actions">
+      <button class="btn btn-primary" id="btnAuth">Pobierz token (client_credentials)</button>
+      <span class="status-msg" id="authMsg"></span>
+    </div>
+  </div>
+
+  <!-- KROK 2: PLIK -->
+  <div class="card">
+    <div class="card-head">
+      <div class="num" id="num2">2</div>
+      <span class="card-title">Wczytaj plik Excel (.xlsx)</span>
+    </div>
+    <div class="drop" id="dropZone">
+      <div class="icon">📂</div>
+      <p><b>Przeciągnij plik .xlsx</b> lub kliknij żeby wybrać</p>
+      <p style="font-size:11px;margin-top:4px;color:#9ca3af">Oczekiwane kolumny: Produkt · EAN · Link Allegro · Cena zakupu · Cena sprzedaży · Prowizja Allegro</p>
+      <input type="file" id="fileInput" accept=".xlsx" />
+    </div>
+    <div id="fileInfo"></div>
+  </div>
+
+  <!-- KROK 3: TABELA -->
+  <div class="card section-hidden" id="step3">
+    <div class="card-head">
+      <div class="num" id="num3">3</div>
+      <span class="card-title">Podgląd i aktualizacja</span>
+    </div>
+    <div class="table-header">
+      <span class="count" id="countLabel"></span>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-primary" id="btnFetch" disabled>⬇ Pobierz dane z Allegro</button>
+        <button class="btn btn-green section-hidden" id="btnExport">💾 Pobierz zaktualizowany Excel</button>
+      </div>
+    </div>
+    <div class="progress-wrap" id="progressWrap" style="display:none">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+    <div class="log" id="fetchLog"></div>
+    <div class="table-wrap" style="margin-top:10px">
+      <table>
+        <thead>
+          <tr>
+            <th class="col-name">Produkt</th>
+            <th class="col-ean">EAN</th>
+            <th class="col-link">Link</th>
+            <th class="col-buy">Cena zakupu</th>
+            <th class="col-low">Najniższa cena</th>
+            <th class="col-pct">Prowizja %</th>
+            <th class="col-amt">Prowizja zł</th>
+            <th class="col-st">Status</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+    <p class="tip" style="margin-top:8px">💡 Ceny zakupu możesz edytować bezpośrednio w tabeli przed pobraniem pliku.</p>
+  </div>
+</div>
+
+<script>
+let rows = [], token = '', wb = null, wsName = '';
+
+// Helpers
+const $ = id => document.getElementById(id);
+function setMsg(el, msg, type='info') {
+  const colors = { ok:'#16a34a', err:'#dc2626', info:'#2563eb', gray:'#6b7280' };
+  $(el).style.color = colors[type] || colors.info;
+  $(el).textContent = msg;
+}
+function markDone(id) {
+  const el=$(id); el.classList.add('done'); el.textContent='✓';
+}
+
+// AUTH
+$('btnAuth').onclick = async () => {
+  const manual = $('manualToken').value.trim();
+  if (manual) {
+    token = manual.startsWith('Bearer ') ? manual.slice(7) : manual;
+    setMsg('authMsg','Token zapisany pomyślnie','ok');
+    markDone('num1'); updateFetchBtn(); return;
+  }
+  const id = $('clientId').value.trim(), secret = $('clientSecret').value.trim();
+  if (!id || !secret) { setMsg('authMsg','Podaj Client ID i Client Secret','err'); return; }
+  setMsg('authMsg','Pobieram token...');
+  try {
+    const r = await fetch('https://allegro.pl/auth/oauth/token?grant_type=client_credentials', {
+      method: 'POST',
+      headers: { 'Authorization': 'Basic ' + btoa(id + ':' + secret), 'Content-Type': 'application/x-www-form-urlencoded' }
+    });
+    if (!r.ok) { const e=await r.json(); setMsg('authMsg','Błąd '+r.status+': '+(e.error_description||'sprawdź klucze'),'err'); return; }
+    const d = await r.json();
+    token = d.access_token;
+    setMsg('authMsg', '✓ Token OK — wygasa za ' + Math.floor(d.expires_in/60) + ' min', 'ok');
+    markDone('num1'); updateFetchBtn();
+  } catch(e) { setMsg('authMsg','Błąd połączenia: '+e.message,'err'); }
+};
+
+// DRAG & DROP
+$('dropZone').onclick = () => $('fileInput').click();
+$('dropZone').ondragover = e => { e.preventDefault(); $('dropZone').classList.add('over'); };
+$('dropZone').ondragleave = () => $('dropZone').classList.remove('over');
+$('dropZone').ondrop = e => { e.preventDefault(); $('dropZone').classList.remove('over'); handleFile(e.dataTransfer.files[0]); };
+$('fileInput').onchange = e => handleFile(e.target.files[0]);
+
+function handleFile(file) {
+  if (!file || !file.name.endsWith('.xlsx')) { alert('Wybierz plik .xlsx'); return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    wb = XLSX.read(e.target.result, { type: 'array' });
+    wsName = wb.SheetNames[0];
+    const ws = wb.Sheets[wsName];
+    const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+    rows = [];
+    for (let i = 1; i < raw.length; i++) {
+      const r = raw[i];
+      const name = String(r[0]||'').trim();
+      if (!name || name === name.toUpperCase() && name.length < 30 && !r[1]) continue; // pomiń nagłówki sekcji
+      const ean = String(r[1]||'').trim();
+      const link = String(r[2]||'').trim();
+      const buyPrice = parseFloat(r[3]) || 0;
+      rows.push({ rowIdx: i, name, ean, link, buyPrice, lowestPrice: '', commissionPct: '', commissionAmt: '', status: 'wait' });
+    }
+    $('fileInfo').innerHTML = `<div class="file-ok">✅ Wczytano: <b>${file.name}</b> — ${rows.length} produktów</div>`;
+    markDone('num2');
+    $('step3').classList.remove('section-hidden');
+    renderTable(); updateSummary(); updateFetchBtn();
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function updateFetchBtn() {
+  $('btnFetch').disabled = !token || !rows.length;
+}
+
+function renderTable() {
+  const tb = $('tableBody'); tb.innerHTML = '';
+  rows.forEach((r, i) => {
+    const tr = document.createElement('tr');
+    const linkCell = r.link
+      ? `<div class="link-cell"><a href="${r.link}" target="_blank">otwórz</a></div>`
+      : `<span class="no-data">brak</span>`;
+    const badgeMap = { wait:'badge-wait', load:'badge-load', ok:'badge-ok', skip:'badge-skip', err:'badge-err' };
+    const badgeLbl = { wait:'oczekuje', load:'...', ok:'OK', skip:'brak EAN', err:'błąd' };
+    const st = r.status || 'wait';
+    tr.innerHTML = `
+      <td title="${r.name}">${r.name}</td>
+      <td>${r.ean || '<span class="no-data">brak</span>'}</td>
+      <td>${linkCell}</td>
+      <td><input type="text" value="${r.buyPrice||''}" data-i="${i}" placeholder="0.00"></td>
+      <td style="color:${r.lowestPrice?'#1a1a1a':'#9ca3af'}">${r.lowestPrice ? r.lowestPrice+' zł' : '—'}</td>
+      <td style="color:${r.commissionPct?'#1a1a1a':'#9ca3af'}">${r.commissionPct ? r.commissionPct+'%' : '—'}</td>
+      <td style="color:${r.commissionAmt?'#1a1a1a':'#9ca3af'}">${r.commissionAmt ? r.commissionAmt+' zł' : '—'}</td>
+      <td><span class="badge ${badgeMap[st]}">${badgeLbl[st]}</span></td>`;
+    tr.querySelector('input').onchange = e => { rows[+e.target.dataset.i].buyPrice = parseFloat(e.target.value)||0; };
+    tb.appendChild(tr);
+  });
+}
+
+function updateSummary() {
+  const withEan = rows.filter(r=>r.ean).length;
+  const done = rows.filter(r=>r.status==='ok').length;
+  $('countLabel').textContent = `${rows.length} produktów · ${withEan} z EAN-em · ${done} zaktualizowanych`;
+}
+
+// FETCH
+$('btnFetch').onclick = async () => {
+  if (!token) { setMsg('fetchLog','Najpierw pobierz token Allegro','err'); return; }
+  const toFetch = rows.filter(r => r.ean);
+  if (!toFetch.length) { $('fetchLog').textContent = 'Brak produktów z EAN-em — nie ma co pobierać.'; return; }
+
+  $('btnFetch').disabled = true;
+  $('btnExport').classList.add('section-hidden');
+  $('progressWrap').style.display = 'block';
+
+  let done = 0;
+  for (const r of toFetch) {
+    const idx = rows.indexOf(r);
+    rows[idx].status = 'load';
+    renderTable(); updateSummary();
+    $('fetchLog').textContent = `Pobieram (${done+1}/${toFetch.length}): ${r.name}`;
+    $('progressBar').style.width = Math.round(done/toFetch.length*100)+'%';
+
+    try {
+      // Szukaj po EAN w listingu publicznym
+      const listUrl = `https://api.allegro.pl/offers/listing?ean=${encodeURIComponent(r.ean)}&limit=10`;
+      const resp = await fetch(listUrl, {
+        headers: { 'Authorization': 'Bearer '+token, 'Accept': 'application/vnd.allegro.public.v1+json' }
+      });
+
+      if (!resp.ok) {
+        rows[idx].status = 'err';
+        done++; continue;
+      }
+
+      const data = await resp.json();
+      const items = [...(data.items?.regular||[]), ...(data.items?.promoted||[])];
+
+      if (!items.length) {
+        rows[idx].status = 'err';
+        rows[idx].lowestPrice = '';
+        done++; continue;
+      }
+
+      // Najniższa cena
+      const prices = items
+        .map(x => parseFloat(x.sellingMode?.price?.amount || x.price?.amount || 0))
+        .filter(p => p > 0);
+      const lowest = prices.length ? Math.min(...prices) : 0;
+      rows[idx].lowestPrice = lowest > 0 ? lowest.toFixed(2) : '';
+
+      // Link do najtańszej oferty
+      if (!rows[idx].link) {
+        const cheapest = items.reduce((a,b) => {
+          const pa = parseFloat(a.sellingMode?.price?.amount||a.price?.amount||0);
+          const pb = parseFloat(b.sellingMode?.price?.amount||b.price?.amount||0);
+          return pb < pa ? b : a;
+        }, items[0]);
+        if (cheapest?.id) rows[idx].link = 'https://allegro.pl/oferta/'+cheapest.id;
+      }
+
+      // Prowizja — pobierz kategorię i stawkę
+      const catId = items[0]?.category?.id;
+      let pct = 8; // domyślna prowizja jeśli nie uda się pobrać
+      if (catId) {
+        try {
+          const catResp = await fetch(`https://api.allegro.pl/sale/categories/${catId}`, {
+            headers: { 'Authorization': 'Bearer '+token, 'Accept': 'application/vnd.allegro.public.v1+json' }
+          });
+          if (catResp.ok) {
+            const cat = await catResp.json();
+            const fee = cat?.commissionRates?.find(x => x.type === 'STANDARD');
+            if (fee?.rate) pct = parseFloat(fee.rate) * 100;
+          }
+        } catch(e) { /* zostaje domyślna */ }
+      }
+
+      rows[idx].commissionPct = pct.toFixed(1);
+      rows[idx].commissionAmt = lowest > 0 ? (lowest * pct / 100).toFixed(2) : '';
+      rows[idx].status = 'ok';
+
+    } catch(e) {
+      rows[idx].status = 'err';
+    }
+
+    done++;
+    await new Promise(res => setTimeout(res, 350)); // krótka pauza żeby nie przeciążyć API
+    renderTable(); updateSummary();
+  }
+
+  // Oznacz produkty bez EAN
+  rows.filter(r => !r.ean && r.status === 'wait').forEach(r => r.status = 'skip');
+
+  $('progressBar').style.width = '100%';
+  const okCount = rows.filter(r => r.status==='ok').length;
+  const errCount = rows.filter(r => r.status==='err').length;
+  $('fetchLog').textContent = `Gotowe! Zaktualizowano: ${okCount}, błędów: ${errCount}, bez EAN-u: ${rows.filter(r=>r.status==='skip').length}`;
+  $('btnFetch').disabled = false;
+  $('btnExport').classList.remove('section-hidden');
+  markDone('num3');
+  renderTable(); updateSummary();
+};
+
+// EKSPORT
+$('btnExport').onclick = () => {
+  const ws = wb.Sheets[wsName];
+  const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+  rows.forEach(r => {
+    const row = raw[r.rowIdx];
+    if (!row) return;
+    // Kolumna 2 = link Allegro
+    if (r.link && !row[2]) row[2] = r.link;
+    // Kolumna 3 = cena zakupu (jeśli zmieniona)
+    if (r.buyPrice) row[3] = r.buyPrice;
+    // Kolumna 4 = cena sprzedaży (najniższa z Allegro) — tylko jeśli pobrana
+    if (r.lowestPrice) row[4] = parseFloat(r.lowestPrice);
+    // Kolumna 5 = prowizja Allegro %
+    if (r.commissionPct) row[5] = parseFloat(r.commissionPct);
+  });
+
+  const newWs = XLSX.utils.aoa_to_sheet(raw);
+  // Skopiuj szerokości kolumn jeśli istnieją
+  if (ws['!cols']) newWs['!cols'] = ws['!cols'];
+  wb.Sheets[wsName] = newWs;
+
+  XLSX.writeFile(wb, 'Allegro_zaktualizowany.xlsx');
+};
+</script>
+</body>
+</html>
