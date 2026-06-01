@@ -1,6 +1,7 @@
 from flask import Flask, request, Response, send_from_directory, jsonify, redirect
 from flask_cors import CORS
 import requests
+import re
 import os
 import base64
 
@@ -9,6 +10,13 @@ CORS(app)
 
 ALLEGRO_BASE = 'https://allegro.pl'
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+SELLER_LOGIN = 'Zaffiro_Official'
+
+HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    'Accept-Language': 'pl-PL,pl;q=0.9,en;q=0.8',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+}
 
 @app.route('/')
 def index():
@@ -52,156 +60,11 @@ def oauth_callback():
     except Exception as e:
         return redirect(f'/?error={str(e)}')
 
-# ── Device code autoryzacja dla monitora cen ──────────────────────────────────
+# ── Device code autoryzacja ───────────────────────────────────────────────────
 
 @app.route('/autoryzuj')
 def autoryzuj():
-    html = '''<!DOCTYPE html>
-<html lang="pl">
-<head>
-<meta charset="UTF-8">
-<title>Autoryzacja Monitora Allegro</title>
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f5f5f5; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
-  .card { background: white; border-radius: 12px; border: 1px solid #e0e0e0; padding: 32px; max-width: 560px; width: 100%; }
-  h1 { font-size: 20px; font-weight: 600; margin-bottom: 6px; }
-  .sub { font-size: 13px; color: #888; margin-bottom: 24px; }
-  .step { background: #f9f9f9; border-radius: 8px; border: 1px solid #e0e0e0; padding: 20px; margin-bottom: 16px; display: none; }
-  .step.active { display: block; }
-  .step h2 { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
-  label { font-size: 13px; color: #555; display: block; margin-bottom: 4px; }
-  input[type=text], input[type=password] { width: 100%; border: 1px solid #ddd; border-radius: 6px; padding: 8px 10px; font-size: 13px; margin-bottom: 12px; }
-  .code-box { background: #1a1a2e; color: #00d4aa; font-family: monospace; font-size: 26px; font-weight: 700; text-align: center; padding: 16px; border-radius: 8px; letter-spacing: 6px; margin: 10px 0; }
-  .url-box { background: #f0f0f0; font-family: monospace; font-size: 12px; padding: 8px 12px; border-radius: 6px; word-break: break-all; margin: 8px 0; }
-  .token-box { background: #f0faf2; border: 1px solid #a5d6a7; font-family: monospace; font-size: 11px; padding: 10px; border-radius: 6px; word-break: break-all; margin: 6px 0; color: #1b5e20; max-height: 80px; overflow-y: auto; }
-  .btn { padding: 9px 18px; border-radius: 6px; border: none; cursor: pointer; font-size: 13px; font-weight: 500; }
-  .btn-orange { background: #ff6600; color: white; }
-  .btn-green { background: #2e7d32; color: white; }
-  .btn-copy { background: #e0e0e0; color: #333; font-size: 12px; padding: 5px 12px; margin-left: 8px; }
-  .error { color: #c62828; font-size: 13px; margin-top: 8px; }
-  .info { font-size: 13px; color: #555; line-height: 1.6; margin-bottom: 10px; }
-  .secret-name { font-family: monospace; font-size: 12px; background: #e0e0e0; padding: 3px 7px; border-radius: 4px; }
-  .row { display: flex; align-items: center; margin-bottom: 10px; gap: 8px; }
-</style>
-</head>
-<body>
-<div class="card">
-  <h1>🔐 Autoryzacja Monitora cen</h1>
-  <p class="sub">Jednorazowa konfiguracja — zajmie ~2 minuty</p>
-
-  <div class="step active" id="step1">
-    <h2>Krok 1 — Podaj dane aplikacji</h2>
-    <p class="info">Wklej Client ID i Client Secret z panelu Allegro Developer. Dane nie są nigdzie zapisywane.</p>
-    <label>Client ID</label>
-    <input type="text" id="clientId" value="edc40ac7c9e54d4a9878c602499a835a" />
-    <label>Client Secret</label>
-    <input type="password" id="clientSecret" placeholder="Wklej Client Secret..." />
-    <button class="btn btn-orange" onclick="startAuth()">Dalej →</button>
-    <div id="err1" class="error"></div>
-  </div>
-
-  <div class="step" id="step2">
-    <h2>Krok 2 — Zaloguj się na Allegro</h2>
-    <p class="info">Twój jednorazowy kod:</p>
-    <div class="code-box" id="userCode">------</div>
-    <p class="info">Otwórz poniższy link, zaloguj się i wpisz kod:</p>
-    <div class="url-box" id="verifyUrl"></div>
-    <a id="verifyLink" href="#" target="_blank" class="btn btn-orange" style="display:inline-block;margin-bottom:14px;text-decoration:none;">Otwórz Allegro ↗</a>
-    <p class="info">Po wpisaniu kodu na stronie Allegro wróć tutaj i kliknij:</p>
-    <button class="btn btn-green" onclick="getToken()">✓ Zalogowałem się</button>
-    <div id="err2" class="error"></div>
-    <div id="status2" style="font-size:13px;color:#888;margin-top:8px;"></div>
-  </div>
-
-  <div class="step" id="step3">
-    <h2>✅ Gotowe! Dodaj sekrety do GitHub</h2>
-    <p class="info">Wejdź w repozytorium <strong>raporty-cen-Allegro-Zaffiro</strong> → Settings → Secrets and variables → Actions i dodaj:</p>
-
-    <div class="row">
-      <span class="secret-name">ALLEGRO_REFRESH_TOKEN</span>
-      <button class="btn btn-copy" onclick="copy('rt')">Kopiuj</button>
-    </div>
-    <div class="token-box" id="rt"></div>
-
-    <div class="row" style="margin-top:12px;">
-      <span class="secret-name">ALLEGRO_ACCESS_TOKEN</span>
-      <button class="btn btn-copy" onclick="copy('at')">Kopiuj</button>
-    </div>
-    <div class="token-box" id="at"></div>
-
-    <p style="font-size:12px;color:#888;margin-top:14px;">Po dodaniu sekretów zaktualizuj monitor.py — wyślę Ci nową wersję.</p>
-  </div>
-</div>
-
-<script>
-let deviceCode = '', clientId = '', clientSecret = '';
-
-async function startAuth() {
-  clientId = document.getElementById('clientId').value.trim();
-  clientSecret = document.getElementById('clientSecret').value.trim();
-  document.getElementById('err1').textContent = '';
-
-  if (!clientSecret) {
-    document.getElementById('err1').textContent = 'Wpisz Client Secret.';
-    return;
-  }
-
-  try {
-    const resp = await fetch('/device/start', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ client_id: clientId, client_secret: clientSecret })
-    });
-    const data = await resp.json();
-    if (data.error) throw new Error(data.error);
-
-    deviceCode = data.device_code;
-    document.getElementById('userCode').textContent = data.user_code;
-    document.getElementById('verifyUrl').textContent = data.verification_uri_complete || data.verification_uri;
-    document.getElementById('verifyLink').href = data.verification_uri_complete || data.verification_uri;
-
-    document.getElementById('step1').classList.remove('active');
-    document.getElementById('step2').classList.add('active');
-  } catch(e) {
-    document.getElementById('err1').textContent = 'Błąd: ' + e.message;
-  }
-}
-
-async function getToken() {
-  document.getElementById('err2').textContent = '';
-  document.getElementById('status2').textContent = 'Sprawdzam...';
-  try {
-    const resp = await fetch('/device/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, device_code: deviceCode })
-    });
-    const data = await resp.json();
-    if (data.error === 'authorization_pending') {
-      document.getElementById('status2').textContent = '⏳ Jeszcze nie zalogowano. Zaloguj się na Allegro i spróbuj ponownie.';
-      return;
-    }
-    if (data.error) throw new Error(data.error_description || data.error);
-
-    document.getElementById('rt').textContent = data.refresh_token || '(brak)';
-    document.getElementById('at').textContent = data.access_token;
-    document.getElementById('step2').classList.remove('active');
-    document.getElementById('step3').classList.add('active');
-  } catch(e) {
-    document.getElementById('err2').textContent = 'Błąd: ' + e.message;
-    document.getElementById('status2').textContent = '';
-  }
-}
-
-function copy(id) {
-  navigator.clipboard.writeText(document.getElementById(id).textContent)
-    .then(() => alert('Skopiowano!'));
-}
-</script>
-</body>
-</html>'''
-    return html
+    return send_from_directory(BASE_DIR, 'autoryzuj.html')
 
 @app.route('/device/start', methods=['POST'])
 def device_start():
@@ -246,6 +109,150 @@ def device_token():
         return jsonify(resp.json())
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+# ── Sprawdzanie cen — główny endpoint dla monitora ────────────────────────────
+
+@app.route('/api/ceny', methods=['POST'])
+def api_ceny():
+    """
+    Przyjmuje listę URL-i produktów Allegro,
+    pobiera strony /oferty-produktu/ i zwraca ceny.
+    Body: { "urls": ["https://allegro.pl/produkt/..."] }
+    """
+    data = request.get_json()
+    urls = data.get('urls', [])
+    results = []
+
+    for url in urls[:50]:  # max 50 na raz
+        offers_url = get_offers_url(url)
+        if not offers_url:
+            results.append({'url': url, 'error': 'Nie rozpoznano URL'})
+            continue
+        try:
+            result = fetch_prices(offers_url)
+            result['url'] = url
+            result['offers_url'] = offers_url
+            results.append(result)
+        except Exception as e:
+            results.append({'url': url, 'error': str(e)})
+
+    return jsonify(results)
+
+
+@app.route('/api/linki-sprzedawcy')
+def api_linki_sprzedawcy():
+    """
+    Pobiera linki do wszystkich produktów sprzedawcy Zaffiro_Official.
+    Parametr: ?strona=1
+    """
+    strona = request.args.get('strona', '1')
+    try:
+        page_url = f'https://allegro.pl/uzytkownik/{SELLER_LOGIN}?p={strona}'
+        resp = requests.get(page_url, headers=HEADERS, timeout=20)
+        html = resp.text
+
+        # Wyciągnij linki do produktów
+        links = re.findall(
+            r'href="(https://allegro\.pl/(?:produkt|oferty-produktu)/[^"?]+)"',
+            html
+        )
+        links = list(dict.fromkeys(links))  # deduplikacja
+
+        # Sprawdź czy jest następna strona
+        has_next = f'p={int(strona)+1}' in html or 'następna' in html.lower()
+
+        # Całkowita liczba ofert
+        total_match = re.search(r'(\d+)\s+ofert', html)
+        total = int(total_match.group(1)) if total_match else 0
+
+        return jsonify({
+            'strona': int(strona),
+            'linki': links,
+            'has_next': has_next,
+            'total': total,
+            'status': resp.status_code,
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+def get_offers_url(url):
+    """Zwraca URL strony /oferty-produktu/ dla danego produktu."""
+    m = re.search(r'/produkt/([^?#]+)', url)
+    if m:
+        return f'https://allegro.pl/oferty-produktu/{m.group(1)}'
+    m = re.search(r'/oferty-produktu/([^?#]+)', url)
+    if m:
+        return f'https://allegro.pl/oferty-produktu/{m.group(1)}'
+    return None
+
+
+def fetch_prices(offers_url):
+    """Pobiera stronę ofert i parsuje ceny."""
+    resp = requests.get(offers_url, headers=HEADERS, timeout=20)
+    if resp.status_code != 200:
+        raise Exception(f'HTTP {resp.status_code}')
+    html = resp.text
+
+    # Nazwa produktu
+    name_match = re.search(r'<h1[^>]*>(.*?)</h1>', html, re.DOTALL)
+    product_name = re.sub(r'<[^>]+>', '', name_match.group(1)).strip() if name_match else 'Nieznany'
+
+    # Parsuj oferty — dziel HTML po offerId
+    offers = []
+    sections = re.split(r'(?=offerId=\d+)', html)
+
+    for section in sections:
+        oid = re.search(r'offerId=(\d+)', section)
+        if not oid:
+            continue
+        offer_id = oid.group(1)
+
+        price_m = re.search(r'(\d[\d\s]*[,\.]\d{2})\s*zł', section)
+        if not price_m:
+            continue
+        try:
+            price = float(price_m.group(1).replace('\xa0','').replace(' ','').replace(',','.'))
+        except ValueError:
+            continue
+
+        # Sprzedawca
+        seller_m = re.search(r'(?:od\s+|">)([A-Za-z0-9_\-\.]{3,50})(?:\s*<|\s*Poleca|\s*\d+\s*ocen)', section)
+        seller = seller_m.group(1).strip() if seller_m else ''
+
+        offers.append({
+            'offer_id': offer_id,
+            'price': price,
+            'seller': seller,
+            'offer_url': f'https://allegro.pl/oferta/{offer_id}',
+        })
+
+    # Deduplikuj i sortuj
+    seen = set()
+    unique = []
+    for o in offers:
+        if o['offer_id'] not in seen:
+            seen.add(o['offer_id'])
+            unique.append(o)
+    unique.sort(key=lambda x: x['price'])
+
+    # Cena Zaffiro
+    zaffiro_price = None
+    for o in unique:
+        if SELLER_LOGIN.lower() in o['seller'].lower() or 'zaffiro' in o['seller'].lower():
+            zaffiro_price = o['price']
+            break
+
+    lowest = unique[0] if unique else None
+
+    return {
+        'product_name': product_name,
+        'zaffiro_price': zaffiro_price,
+        'lowest_price': lowest['price'] if lowest else None,
+        'lowest_seller': lowest['seller'] if lowest else '',
+        'lowest_offer_url': lowest['offer_url'] if lowest else '',
+        'offer_count': len(unique),
+    }
 
 # ── Proxy do Allegro API ──────────────────────────────────────────────────────
 
